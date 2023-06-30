@@ -17,7 +17,6 @@ source('load/functions.R')
 source('load/data.R')
 
 
-
 # Calculate career statistics for goalies
 career_statistics <- 
   shots %>%  # tibble containing shot data loaded by the 'data' script
@@ -28,7 +27,8 @@ career_statistics <-
     saves = shots - goals, # Calculate the total number of saves made by subtracting the total goals from the total shots
     mean_sv_pct = 1 - mean(goal),  # Calculate the mean save percentage by subtracting the mean of goals from 1
     .groups = 'drop') %>%  # Drop grouping information
-  filter(shots > 600) %>%  # Keep goalies with more than 750 shots
+  filter(shots > 200) %>%  # Keep goalies with more than 750 shots
+  filter(goals > 0) %>%
   drop_na()  # Remove rows with missing values
 
 
@@ -48,7 +48,7 @@ career_statistics %>%
 
 # Save the plot as a PNG file
 ggsave(
-  filename = 'goalie-performance-1-one.png',  # Specify the file name
+  filename = 'goalie-performance-1-1.png',  # Specify the file name
   path = '/Users/ada/Documents/projects/spazznolo.github.io/figs',  # Specify the file path
   width = 5,  # Set the width of the plot
   height = 3,  # Set the height of the plot
@@ -81,7 +81,7 @@ prior_points = prior_points/sum(prior_points)
 # Create a histogram of career save percentages overlaid with the prior probability densities
 ggplot() +
   geom_histogram(data = career_statistics, aes(mean_sv_pct), fill = single_color, col = 'black', alpha = 0.75, bins = 15) +
-  geom_line(aes(sv_pct_fits, prior_points*180*3), col = 'white', lwd = 1, alpha = 0.75) +
+  geom_line(aes(sv_pct_fits, prior_points*nrow(career_statistics)*3), col = 'white', lwd = 1, alpha = 0.75) +
   dark_theme() +
   theme(
     panel.grid.major = element_line(color = 'black'),  # Customize major grid lines
@@ -93,7 +93,7 @@ ggplot() +
 
 # Save the plot as a PNG file
 ggsave(
-  filename = 'goalie-performance-1-two.png',  # Specify the file name
+  filename = 'goalie-performance-1-2.png',  # Specify the file name
   path = '/Users/ada/Documents/projects/spazznolo.github.io/figs',  # Specify the file path
   width = 5,  # Set the width of the plot
   height = 3,  # Set the height of the plot
@@ -202,7 +202,7 @@ plot_h2h_dists('Jake Oettinger', 'Jeremy Swayman')
 
 # Save the plot as a PNG file
 ggsave(
-  filename = 'goalie-performance-1-three.png',  # Specify the file name
+  filename = 'goalie-performance-1-3.png',  # Specify the file name
   path = '/Users/ada/Documents/projects/spazznolo.github.io/figs',  # Specify the file path
   width = 5,  # Set the width of the plot
   height = 3,  # Set the height of the plot

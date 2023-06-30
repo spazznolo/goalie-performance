@@ -64,20 +64,20 @@ career_statistics <-
     inv_adj_sv_pct = 1 - adj_sv_pct,
     .groups = 'drop'
   ) %>%
-  dplyr::filter(exp_g > 50) %>%  # Filter rows where expected goals is greater than 10
+  dplyr::filter(shots > 200) %>%  # Filter rows where expected goals is greater than 10
   drop_na()  # Drop rows with missing values
 
 # Calculate median career average save percentage
 median_sv_pct <- median(career_statistics$adj_sv_pct)
 
 # Generate sequence of save percentage values
-sv_pct_fits = seq(min(career_statistics$inv_adj_sv_pct), max(career_statistics$inv_adj_sv_pct), length = 45)
+sv_pct_fits = seq(min(career_statistics$adj_sv_pct), max(career_statistics$adj_sv_pct), length = 45)
 
 
 # Fit prior distributions to the observed career save percentages
 
 # Fit a weibull distribution to the career save percentages using maximum likelihood estimation
-weibull_prior = fitdistr(career_statistics$inv_adj_sv_pct, "weibull")
+weibull_prior = fitdistr(career_statistics$adj_sv_pct, "weibull")
 
 # Extract the estimated shape parameters from the fitted weibull distribution
 weibull_1 = weibull_prior$estimate[1]
@@ -91,7 +91,7 @@ weibull_prior_points = weibull_prior_points/sum(weibull_prior_points)
 
 
 # Fit a gamma distribution to the career save percentages using maximum likelihood estimation
-gamma_prior = fitdistr(career_statistics$inv_adj_sv_pct, "gamma")
+gamma_prior = fitdistr(career_statistics$adj_sv_pct, "gamma")
 
 # Extract the estimated shape parameters from the fitted gamma distribution
 gamma_1 = gamma_prior$estimate[1]
@@ -105,7 +105,7 @@ gamma_prior_points = gamma_prior_points/sum(gamma_prior_points)
 
 
 # Fit a beta distribution to the career save percentages using maximum likelihood estimation
-beta_prior = fitdist(career_statistics$inv_adj_sv_pct, "beta")
+beta_prior = fitdist(career_statistics$adj_sv_pct, "beta")
 
 # Extract the estimated shape parameters from the fitted beta distribution
 beta_1 = beta_prior$estimate[1]
@@ -120,9 +120,9 @@ beta_prior_points = beta_prior_points/sum(beta_prior_points)
 
 # Create a histogram of career save percentages overlaid with the prior probability densities
 ggplot() +
-  geom_histogram(data = career_statistics, aes(inv_adj_sv_pct), fill = single_color, col = 'black', alpha = 0.75, bins = 20) +
+  geom_histogram(data = career_statistics, aes(adj_sv_pct), fill = single_color, col = 'black', alpha = 0.75, bins = 20) +
   geom_line(aes(sv_pct_fits, beta_prior_points*nrow(career_statistics)*45/20), col = 'white', lwd = 1, alpha = 0.75) +
-  #geom_line(aes(1 - sv_pct_fits, weibull_prior_points*nrow(career_statistics)*45/20), col = 'red', lwd = 1, alpha = 0.75) +
+  geom_line(aes(sv_pct_fits, weibull_prior_points*nrow(career_statistics)*45/20), col = 'red', lwd = 1, alpha = 0.75) +
   dark_theme() +
   theme(
     panel.grid.major = element_line(color = 'black'),  # Customize major grid lines
@@ -133,7 +133,7 @@ ggplot() +
 
 # Save the plot as a PNG file
 ggsave(
-  filename = 'goalie-five-one.png',  # Specify the file name
+  filename = 'goalie-performance-2-1.png',  # Specify the file name
   path = '/Users/ada/Documents/projects/spazznolo.github.io/figs',  # Specify the file path
   width = 5,  # Set the width of the plot
   height = 3,  # Set the height of the plot
@@ -143,15 +143,14 @@ ggsave(
 
 
 
-
 # Calculate adjusted save percentage and posterior alpha and beta values
 career_posteriors <- 
   career_statistics %>%
   mutate(
-    post_sv_pct = (beta_1 + shots - adj_saves)/(beta_1 + beta_2 + shots),  # Calculate adjusted save percentage
-    alpha_post = beta_1 + shots - adj_saves,  # Calculate posterior alpha values
-    beta_post = beta_2 + adj_saves,  # Calculate posterior beta values
-    better_avg = map2_dbl(alpha_post, beta_post, ~mean(rbeta(100000, shape1 = .x, shape2 = .y) < median(career_statistics$inv_adj_sv_pct)))  # Calculate proportion of values greater than median_sv_pct
+    post_sv_pct = (beta_1 + adj_saves)/(beta_1 + beta_2 + shots),  # Calculate adjusted save percentage
+    alpha_post = beta_1 + adj_saves,  # Calculate posterior alpha values
+    beta_post = beta_2 + shots - adj_saves,  # Calculate posterior beta values
+    better_avg = map2_dbl(alpha_post, beta_post, ~mean(rbeta(100000, shape1 = .x, shape2 = .y) > median(career_statistics$adj_sv_pct)))  # Calculate proportion of values greater than median_sv_pct
   )
 
 
@@ -194,11 +193,10 @@ comp_h2h <- function(goalie_a, goalie_b) {
   }
   
   # Compute the mean proportion of outcomes where goalie_a performs better than goalie_b
-  return(paste("Probability that", goalie_a, "is better than", goalie_b, "is", 100*mean(outcomes_a < outcomes_b), "%."))
+  return(paste("Probability that", goalie_a, "is better than", goalie_b, "is", 100*mean(outcomes_a > outcomes_b), "%."))
 }
 
 comp_h2h('Jeremy Swayman', 'Jake Oettinger')
-comp_h2h('Tuukka Rask', 'Ilya Sorokin')
 
 # Function to plot comparison of two goalie posterior distributions
 plot_h2h_dists <- function(goalie_a, goalie_b) {
@@ -215,11 +213,11 @@ plot_h2h_dists <- function(goalie_a, goalie_b) {
   # Create a histogram of samples from the prior distribution, adjusted save distributions, and vertical lines for medians and adjusted save percentages
   ggplot() +
     geom_vline(aes(xintercept = median(career_statistics$adj_sv_pct)), lwd = 0.75, col = single_color, alpha = 0.35, linetype = 'dashed') +
-    geom_vline(aes(xintercept = 1 - adj_sv_dist$post_sv_pct[1]), lwd = 0.75, col = 'white', alpha = 0.60, linetype = 'dashed') +
-    geom_histogram(aes(sample(1 - sv_pct_fits, 100000, prob = beta_prior_points, replace = TRUE)), fill = single_color, col = 'black', alpha = 0.5, bins = 45) +
-    geom_vline(aes(xintercept = 1 - adj_sv_dist$post_sv_pct[2]), lwd = 0.75, col = 'grey', alpha = 0.60, linetype = 'dashed') +
-    geom_line(aes(1 - sv_pct_fits, 100000*adj_sv_dist$adj_sv_dist[[2]]/sum(adj_sv_dist$adj_sv_dist[[2]])), col = 'grey', lwd = 0.75, alpha = 0.75) +
-    geom_line(aes(1 - sv_pct_fits, 100000*adj_sv_dist$adj_sv_dist[[1]]/sum(adj_sv_dist$adj_sv_dist[[1]])), col = 'white', lwd = 0.75, alpha = 0.75) +
+    geom_vline(aes(xintercept = adj_sv_dist$post_sv_pct[1]), lwd = 0.75, col = 'white', alpha = 0.60, linetype = 'dashed') +
+    geom_histogram(aes(sample(sv_pct_fits, 100000, prob = beta_prior_points, replace = TRUE)), fill = single_color, col = 'black', alpha = 0.5, bins = 45) +
+    geom_vline(aes(xintercept = adj_sv_dist$post_sv_pct[2]), lwd = 0.75, col = 'grey', alpha = 0.60, linetype = 'dashed') +
+    geom_line(aes(sv_pct_fits, 100000*adj_sv_dist$adj_sv_dist[[2]]/sum(adj_sv_dist$adj_sv_dist[[2]])), col = 'grey', lwd = 0.75, alpha = 0.75) +
+    geom_line(aes(sv_pct_fits, 100000*adj_sv_dist$adj_sv_dist[[1]]/sum(adj_sv_dist$adj_sv_dist[[1]])), col = 'white', lwd = 0.75, alpha = 0.75) +
     annotate("text", x = 0.915, y = 4000, label = adj_sv_dist$goalie_name[1], col = 'white') +
     annotate("text", x = 0.915, y = 6000, label = adj_sv_dist$goalie_name[2], col = 'grey') +
     dark_theme() +
@@ -238,7 +236,7 @@ plot_h2h_dists('Jeremy Swayman', 'Jake Oettinger')
 
 # Save the plot as a PNG file
 ggsave(
-  filename = 'goalie-five-two.png',  # Specify the file name
+  filename = 'goalie-performance-2-2.png',  # Specify the file name
   path = '/Users/ada/Documents/projects/spazznolo.github.io/figs',  # Specify the file path
   width = 5,  # Set the width of the plot
   height = 3,  # Set the height of the plot
@@ -264,13 +262,13 @@ sv_adj <-
   labs(x = '\nSV%', y = 'AdjSV%\n')  # Set x and y axis labels to empty
 
 
-cor_adj_post = round(cor(career_posteriors$adj_sv_pct, 1 - career_posteriors$post_sv_pct), 3)
+cor_adj_post = round(cor(career_posteriors$adj_sv_pct, career_posteriors$post_sv_pct), 3)
 
 # Compare raw save percentage to adjusted save percentages
 adj_post <-
   career_posteriors %>%
   ggplot() +
-  geom_point(aes(adj_sv_pct, 1 - post_sv_pct, col = exp_g), alpha = 0.75) +
+  geom_point(aes(adj_sv_pct, post_sv_pct, col = exp_g), alpha = 0.75) +
   scale_colour_gradientn("xG Faced", colours = multiple_colors(10)) +
   dark_theme() +  # Apply dark theme to the plot
   annotate("text", x = 0.913, y = 0.95, label = paste0('cor = ', cor_adj_post), col = 'white') +
@@ -280,13 +278,13 @@ adj_post <-
   labs(x = '\nAdjSV%', y = 'Posterior AdjSV%\n')  # Set x and y axis labels to empty
 
 
-cor_sv_post = round(cor(career_posteriors$sv_pct, 1 - career_posteriors$post_sv_pct), 3)
+cor_sv_post = round(cor(career_posteriors$sv_pct, career_posteriors$post_sv_pct), 3)
 
 # Compare raw save percentage to adjusted save percentages
 sv_post <-
   career_posteriors %>%
   ggplot() +
-  geom_point(aes(sv_pct, 1 - post_sv_pct, col = exp_g), alpha = 0.75) +
+  geom_point(aes(sv_pct, post_sv_pct, col = exp_g), alpha = 0.75) +
   scale_colour_gradientn("xG Faced", colours = multiple_colors(10)) +
   dark_theme() +  # Apply dark theme to the plot
   annotate("text", x = 0.913, y = 0.95, label = paste0('cor = ', cor_sv_post), col = 'white') +
@@ -300,7 +298,7 @@ sv_post <-
 xg_post <-
 career_posteriors %>%
   ggplot() +
-  geom_point(aes(exp_g, 1 - post_sv_pct, col = exp_g), alpha = 0.75) +
+  geom_point(aes(exp_g, post_sv_pct, col = exp_g), alpha = 0.75) +
   scale_colour_gradientn("xG Faced", colours = multiple_colors(10)) +
   dark_theme() +  # Apply dark theme to the plot
   theme(
@@ -313,7 +311,7 @@ ggarrange(sv_adj, adj_post, sv_post, xg_post, ncol=2, nrow=2, common.legend = TR
 
 # Save the plot as a PNG file
 ggsave(
-  filename = 'goalie-five-three.png',  # Specify the file name
+  filename = 'goalie-performance-2-3.png',  # Specify the file name
   path = '/Users/ada/Documents/projects/spazznolo.github.io/figs',  # Specify the file path
   width = 10,  # Set the width of the plot
   height = 6,  # Set the height of the plot
