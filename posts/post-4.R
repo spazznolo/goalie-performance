@@ -164,7 +164,7 @@ ggsave(
   dpi = 320  # Set the resolution of the plot
 )
 
-
+shots
 seasons_played <-
   shots_with_cml %>%
   distinct(goalie_name, season) %>%
@@ -343,9 +343,13 @@ ggsave(
 
 
 
+(0.5*beta_over_1) + (0.5*beta_over_2)
 
-
-
+shots_with_post %>%
+  group_by(goalie_name) %>%
+  slice(1) %>%
+  ungroup() %>%
+  select(goalie_name, cml_shots, post_sv_pct, pred)
 
 
 shots_with_post <- 
@@ -355,10 +359,10 @@ shots_with_post <-
     cml_adj_saves = adj_sv_pct*cml_shots,
     pred = predict(glm_model, ., type = 'response'),
     pred = ifelse(cml_shots > 1500, 1, pred),
-    post_good = ((beta_good_1 + cml_adj_saves)/(beta_good_1 + beta_good_2 + cml_shots)),
-    post_bad = ((beta_bad_1 + cml_adj_saves)/(beta_bad_1 + beta_bad_2 + cml_shots)),
-    post_sv_pct = (pred*(beta_good_1 + cml_adj_saves)/(beta_good_1 + beta_good_2 + cml_shots)) + 
-      ((1 - pred)*(beta_bad_1 + cml_adj_saves)/(beta_bad_1 + beta_bad_2 + cml_shots))
+    post_good = ((beta_over_1 + cml_adj_saves)/(beta_over_1 + beta_over_2 + cml_shots)),
+    post_bad = ((beta_under_1 + cml_adj_saves)/(beta_under_1 + beta_under_2 + cml_shots)),
+    post_sv_pct = (pred*(beta_over_1 + cml_adj_saves)/(beta_over_1 + beta_over_2 + cml_shots)) + 
+      ((1 - pred)*(beta_under_1 + cml_adj_saves)/(beta_under_1 + beta_under_2 + cml_shots))
     )
 
 shots_with_post %>%
